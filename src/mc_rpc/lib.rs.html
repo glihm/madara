@@ -262,6 +262,46 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Starknet RPC server API implementation
 //!
 //! It uses the madara client and backend in order to answer queries.
@@ -280,7 +320,7 @@
 <span class="kw">pub use </span>mc_rpc_core::StarknetRpcApiServer;
 <span class="kw">use </span>mc_rpc_core::{
     BlockHashAndNumber, BlockId <span class="kw">as </span>StarknetBlockId, ContractAddress, FunctionCall, RPCContractClass,
-    SierraContractClass,
+    SierraContractClass, TransactionHash, RpcTransaction,
 };
 <span class="kw">use </span>mc_storage::OverrideHandle;
 <span class="kw">use </span>pallet_starknet::runtime_api::StarknetRuntimeApi;
@@ -477,6 +517,46 @@
         // })?;
 
         </span><span class="prelude-val">Ok</span>(RPCContractClass::ContractClass(SierraContractClass::default()))
+    }
+
+    <span class="doccomment">/// Gets the status and details of a submitted transaction.
+    </span><span class="kw">fn </span>get_transaction_by_hash(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        tx_hash: TransactionHash,
+    ) -&gt; RpcResult&lt;RpcTransaction&gt; {
+
+        <span class="kw">let </span>tx_h256 = H256::from_str(<span class="kw-2">&amp;</span>tx_hash).map_err(|e| {
+            <span class="macro">error!</span>(<span class="string">&quot;GetTransactionByHash: Failed to convert &#39;{tx_hash}&#39; to H256: {e}&quot;</span>);
+            StarknetRpcApiError::InvalidHash
+        })<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>substrate_block_hash = <span class="self">self
+            </span>.substrate_block_hash_from_starknet_block(
+                StarknetBlockId::BlockTag(mc_rpc_core::BlockTag::Latest))
+            .map_err(|e| {
+                <span class="macro">error!</span>(<span class="string">&quot;&#39;{e}&#39;&quot;</span>);
+                StarknetRpcApiError::BlockNotFound
+            })<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>runtime_api = <span class="self">self</span>.client.runtime_api();
+        <span class="kw">let </span>result = runtime_api.get_transaction_by_hash(
+            substrate_block_hash,
+            tx_h256)
+            .map_err(|e| {
+                <span class="macro">error!</span>(<span class="string">&quot;GetTransactionByHash: Runtime call has failed: &#39;{e}&#39;&quot;</span>);
+                StarknetRpcApiError::InternalServerError
+            })<span class="question-mark">?</span>;
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(tx) = result {
+            <span class="comment">// TODO: Actual mapping of the receip retrieved from runtime.
+            </span><span class="prelude-val">Ok</span>(RpcTransaction {
+                f1: <span class="number">234</span>,
+                tx_hash: String::from(H256::zero().to_string()),
+            })
+        } <span class="kw">else </span>{
+            <span class="macro">error!</span>(<span class="string">&quot;GetTransactionByHash: Runtime returned None&quot;</span>);
+            <span class="prelude-val">Err</span>(StarknetRpcApiError::TxnHashNotFound.into())
+        }
     }
 }
 

@@ -355,6 +355,18 @@
 <a href="#355" id="355">355</a>
 <a href="#356" id="356">356</a>
 <a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Definition of the Starknet Appchain runtime.
 //! A Starknet Appchain runtime can be used to run a Starknet Appchain, either as a standalone
 //! L2 validity rollup, settling on Ethereum or as a L3 application-specific rollup, settling on
@@ -386,6 +398,7 @@
 <span class="kw">pub use </span>frame_support::{construct_runtime, parameter_types, StorageValue};
 <span class="kw">pub use </span>frame_system::Call <span class="kw">as </span>SystemCall;
 <span class="kw">use </span>mp_starknet::execution::types::{ClassHashWrapper, ContractAddressWrapper, ContractClassWrapper};
+<span class="kw">use </span>mp_starknet::transaction::types::TransactionReceiptWrapper;
 <span class="kw">pub use </span>pallet_balances::Call <span class="kw">as </span>BalancesCall;
 <span class="kw">use </span>pallet_grandpa::{fg_primitives, AuthorityId <span class="kw">as </span>GrandpaId, AuthorityList <span class="kw">as </span>GrandpaAuthorityList};
 <span class="doccomment">/// Import the StarkNet pallet.
@@ -648,6 +661,17 @@
         <span class="kw">fn </span>contract_class_by_class_hash(class_hash: ClassHashWrapper) -&gt; <span class="prelude-ty">Option</span>&lt;ContractClassWrapper&gt; {
             Starknet::contract_class_by_class_hash(class_hash)
         }
+
+        <span class="doccomment">/// Retrieves a transaction&#39;s receip from the storage based on the transaction hash.
+        </span><span class="kw">fn </span>get_transaction_by_hash(tx_hash: H256) -&gt; <span class="prelude-ty">Option</span>&lt;TransactionReceiptWrapper&gt; {
+            <span class="comment">// TODO: Naive approach.
+            //   1. Check if the transaction is not in the pending block transactions.
+            //   2. Go over all blocks in the storage with TxHashes, and find the tx_hash.
+            //   3. Not found handling.
+            // Notes -&gt; The receips are not stored yet, only transactions.
+
+            </span><span class="kw">return </span><span class="prelude-val">None
+        </span>}
     }
 
     <span class="attr">#[cfg(feature = <span class="string">&quot;runtime-benchmarks&quot;</span>)]

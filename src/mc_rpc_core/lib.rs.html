@@ -343,6 +343,22 @@
 <a href="#343" id="343">343</a>
 <a href="#344" id="344">344</a>
 <a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Starknet RPC API trait and types
 //!
 //! Starkware maintains [a description of the Starknet API](https://github.com/starkware-libs/starknet-specs/blob/master/api/starknet_api_openrpc.json)
@@ -362,11 +378,13 @@
 <span class="kw">use </span>jsonrpsee::core::RpcResult;
 <span class="kw">use </span>jsonrpsee::proc_macros::rpc;
 <span class="kw">use </span>mp_starknet::execution::types::{ContractClassWrapper, EntryPointTypeWrapper, EntryPointWrapper, MaxEntryPoints};
+<span class="kw">use </span>mp_starknet::transaction::types::Transaction;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 
 <span class="kw">pub type </span>FieldElement = String;
 <span class="kw">pub type </span>BlockNumber = u64;
 <span class="kw">pub type </span>BlockHash = FieldElement;
+<span class="kw">pub type </span>TransactionHash = FieldElement;
 
 <span class="kw">pub type </span>ContractAddress = FieldElement;
 
@@ -599,6 +617,14 @@
     ContractClass(SierraContractClass),
 }
 
+<span class="doccomment">/// Starknet transaction for RPC serving.
+</span><span class="attr">#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+</span><span class="kw">pub struct </span>RpcTransaction {
+    <span class="kw">pub </span>f1: u32,
+    <span class="kw">pub </span>tx_hash: TransactionHash,
+    <span class="comment">// TODO: receip itself.
+</span>}
+
 <span class="doccomment">/// Returns a `ContractClassWrapper` from a `RPCContractClass`
 </span><span class="kw">pub fn </span>to_rpc_contract_class(_contract_class_wrapped: ContractClassWrapper) -&gt; <span class="prelude-ty">Result</span>&lt;RPCContractClass&gt; {
     <span class="prelude-val">Ok</span>(RPCContractClass::ContractClass(Default::default()))
@@ -687,6 +713,12 @@
     <span class="doccomment">/// Get the contract class at a given contract address for a given block id
     </span><span class="attr">#[method(name = <span class="string">&quot;getClassAt&quot;</span>)]
     </span><span class="kw">fn </span>get_class_at(<span class="kw-2">&amp;</span><span class="self">self</span>, contract_address: ContractAddress, block_id: BlockId) -&gt; RpcResult&lt;RPCContractClass&gt;;
+
+    <span class="doccomment">/// Gets the status and details of a submitted transaction.
+    /// TODO: for now it returns a Transaction, but it should be changed to
+    /// TransactionReceiptWrapper (but only Transaction type is stored for now).
+    </span><span class="attr">#[method(name = <span class="string">&quot;getTransactionByHash&quot;</span>)]
+    </span><span class="kw">fn </span>get_transaction_by_hash(<span class="kw-2">&amp;</span><span class="self">self</span>, tx_hash: TransactionHash) -&gt; RpcResult&lt;RpcTransaction&gt;;
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mc_rpc_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0-nightly (34e6673a0 2023-02-25)" data-search-js="search-14421e1532aead08.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>
