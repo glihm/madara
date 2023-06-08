@@ -191,13 +191,17 @@
 <a href="#191" id="191">191</a>
 <a href="#192" id="192">192</a>
 <a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::BTreeMap;
 <span class="kw">use </span>std::marker::PhantomData;
 <span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>frame_support::{Identity, StorageHasher};
-<span class="kw">use </span>mp_starknet::block::Block <span class="kw">as </span>StarknetBlock;
-<span class="kw">use </span>mp_starknet::execution::types::{ClassHashWrapper, ContractAddressWrapper, ContractClassWrapper};
+<span class="kw">use </span>mp_starknet::execution::types::{ClassHashWrapper, ContractAddressWrapper, ContractClassWrapper, Felt252Wrapper};
 <span class="kw">use </span>mp_starknet::storage::StarknetStorageSchemaVersion;
 <span class="kw">use </span>mp_starknet::transaction::types::EventWrapper;
 <span class="kw">use </span>pallet_starknet::runtime_api::StarknetRuntimeApi;
@@ -248,8 +252,6 @@
 /// State Backend with some assumptions about pallet-starknet&#39;s storage schema. Using such an
 /// optimized implementation avoids spawning a runtime and the overhead associated with it.
 </span><span class="kw">pub trait </span>StorageOverride&lt;B: BlockT&gt;: Send + Sync {
-    <span class="doccomment">/// Return the current block.
-    </span><span class="kw">fn </span>current_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: B::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;StarknetBlock&gt;;
     <span class="doccomment">/// Return the class hash at the provided address for the provided block.
     </span><span class="kw">fn </span>contract_class_hash_by_address(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -272,6 +274,8 @@
     </span><span class="kw">fn </span>nonce(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: B::Hash, address: ContractAddressWrapper) -&gt; <span class="prelude-ty">Option</span>&lt;NonceWrapper&gt;;
     <span class="doccomment">/// Returns the events for a provided block hash.
     </span><span class="kw">fn </span>events(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: B::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;EventWrapper&gt;&gt;;
+    <span class="doccomment">/// Returns the storage value for a provided key and block hash.
+    </span><span class="kw">fn </span>chain_id(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: B::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;Felt252Wrapper&gt;;
 }
 
 <span class="doccomment">/// Returns the storage prefix given the pallet module name and the storage name
@@ -305,12 +309,6 @@
     C: ProvideRuntimeApi&lt;B&gt; + Send + Sync,
     C::Api: StarknetRuntimeApi&lt;B&gt;,
 {
-    <span class="kw">fn </span>current_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: B::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;StarknetBlock&gt; {
-        <span class="kw">let </span>api = <span class="self">self</span>.client.runtime_api();
-
-        api.current_block(block_hash).ok()
-    }
-
     <span class="kw">fn </span>contract_class_by_address(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         block_hash: &lt;B <span class="kw">as </span>BlockT&gt;::Hash,
@@ -382,6 +380,18 @@
     /// * `Some(events)` - The events for the provided block hash
     </span><span class="kw">fn </span>events(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: &lt;B <span class="kw">as </span>BlockT&gt;::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;Vec&lt;EventWrapper&gt;&gt; {
         <span class="self">self</span>.client.runtime_api().events(block_hash).ok()
+    }
+
+    <span class="doccomment">/// Return the chain id for a provided block hash.
+    ///
+    /// # Arguments
+    ///
+    /// * `block_hash` - The block hash
+    ///
+    /// # Returns
+    /// * `Some(chain_id)` - The chain id for the provided block hash
+    </span><span class="kw">fn </span>chain_id(<span class="kw-2">&amp;</span><span class="self">self</span>, block_hash: &lt;B <span class="kw">as </span>BlockT&gt;::Hash) -&gt; <span class="prelude-ty">Option</span>&lt;Felt252Wrapper&gt; {
+        <span class="self">self</span>.client.runtime_api().chain_id(block_hash).ok()
     }
 }
 </code></pre></div>
