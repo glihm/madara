@@ -8,6 +8,7 @@
 //! the [`FieldElement`] type from starknet-ff.
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 use cairo_vm::felt::Felt252;
 use scale_codec::{Decode, Encode, EncodeLike, Error, Input, MaxEncodedLen, Output};
@@ -92,6 +93,19 @@ impl Default for Felt252Wrapper {
 impl From<Felt252Wrapper> for [u8; 32] {
     fn from(felt: Felt252Wrapper) -> Self {
         felt.0.to_bytes_be()
+    }
+}
+
+/// [`Felt252Wrapper`] from bytes.
+/// Overflow may occur and return [`Felt252WrapperError::OutOfRange`].
+impl TryFrom<[u8; 32]> for Felt252Wrapper {
+    type Error = Felt252WrapperError;
+
+    fn try_from(bytes: [u8; 32]) -> Result<Self, Felt252WrapperError> {
+        match FieldElement::from_bytes_be(&bytes) {
+            Ok(ff) => Ok(Self(ff)),
+            Err(_) => Err(Felt252WrapperError::FromArrayError),
+        }
     }
 }
 
@@ -237,10 +251,63 @@ impl From<Felt252Wrapper> for StarkFelt {
     }
 }
 
+const SCALE_FELT252_COMPACTION_MARKER: u8 = 0x80;
+const CTR_STOP_VALUE: u8 = 0;
+
 /// SCALE trait.
+///
+/// Encodes a felt252 with memory optimization.
+/// Felt252 are represented as 32 bytes, and with
+/// almost always several repeated values (0 and 255 most often).
+///
+/// This encoding proposes a simple buffer compaction, counting
+/// occurences of each of the bytes of the felt252.
+///
+/// Memory is usually reduced by more than half for all values
+/// below u128::MAX.
+/// In worst scenarios with keccak hashes for instance, we are still
+/// 32 bytes long.
 impl Encode for Felt252Wrapper {
     fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
-        dest.write(&self.0.to_bytes_be());
+        let mut compacted: Vec<u8> = Vec::new();
+        let mut ctr: u8 = 1;
+
+        let buf = self.0.to_bytes_be();
+
+        // A value can't occur more than 32 times.
+        const CTR_MAX: u8 = 32;
+
+        for i in 1..buf.len() {
+            if buf[i] == buf[i - 1] && ctr <= CTR_MAX {
+                ctr += 1;
+            } else {
+                // Counter comes before, to ensure we can
+                // use the CTR_STOP_VALUE.
+                compacted.push(ctr);
+                compacted.push(buf[i - 1]);
+                ctr = 1;
+            }
+        }
+
+        // Last byte.
+        compacted.push(ctr);
+        compacted.push(buf[buf.len() - 1]);
+
+        // Add compaction stop value to allow decoding.
+        compacted.push(CTR_STOP_VALUE);
+
+        if compacted.len() >= buf.len() {
+            // Too much entropy, keep the buffer as is.
+            dest.write(&buf);
+        } else {
+            // Add compaction marker (MSb set to 1).
+            // Counter max value is 32, so there is no conflict with
+            // the compaction marker.
+            // Also, the maximum value for the first byte of felt252 buffer
+            // (little endian) is 0x08. Which does not conflict neither.
+            compacted[0] = compacted[0] | SCALE_FELT252_COMPACTION_MARKER;
+            dest.write(&compacted[..]);
+        }
     }
 }
 
@@ -255,14 +322,52 @@ impl MaxEncodedLen for Felt252Wrapper {
 }
 
 /// SCALE trait.
+///
+/// Decodes a compacted felt252 buffer, only
+/// if the compaction marker is found.
+/// Deserializes the felt252 buffer otherwise.
 impl Decode for Felt252Wrapper {
     fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-        let mut buf: [u8; 32] = [0; 32];
-        input.read(&mut buf)?;
 
-        match Felt252Wrapper::try_from(&buf) {
+        // First byte is a counter, but also may contain
+        // the compaction marker.
+        let mut ctr = input.read_byte()?;
+
+        if ctr & SCALE_FELT252_COMPACTION_MARKER == 0 {
+            // No compaction, return the felt252 buffer as is.
+            let mut buf: [u8; 31] = [0; 31];
+            input.read(&mut buf)?;
+
+            // Add the first byte and return.
+            let mut v = buf.to_vec();
+            v.insert(0, ctr);
+
+            match Felt252Wrapper::try_from(&v[..]) {
+                Ok(felt) => return Ok(felt),
+                Err(e) => return Err(Error::from("Can't get FieldElement from input buffer (not compacted).")
+                                     .chain(hex::encode(&v[..]))
+                                     .chain(e)),
+            }
+        }
+
+        let mut expanded: Vec<u8> = Vec::new();
+
+        // Remove the compaction marker from the first counter.
+        ctr = ctr & !SCALE_FELT252_COMPACTION_MARKER;
+
+        while ctr != CTR_STOP_VALUE {
+            let byte_value = input.read_byte()?;
+
+            for _ in 0..ctr {
+                expanded.push(byte_value);
+            }
+
+            ctr = input.read_byte()?;
+        }
+
+        match Felt252Wrapper::try_from(&expanded[..]) {
             Ok(felt) => Ok(felt),
-            Err(e) => Err(Error::from("Can't get FieldElement from input buffer.").chain(hex::encode(buf)).chain(e)),
+            Err(e) => Err(Error::from("Can't get FieldElement from input buffer (compacted).").chain(hex::encode(&expanded[..])).chain(e)),
         }
     }
 }
