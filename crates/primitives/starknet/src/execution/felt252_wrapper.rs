@@ -305,7 +305,7 @@ impl Encode for Felt252Wrapper {
             // the compaction marker.
             // Also, the maximum value for the first byte of felt252 buffer
             // (little endian) is 0x08. Which does not conflict neither.
-            compacted[0] = compacted[0] | SCALE_FELT252_COMPACTION_MARKER;
+            compacted[0] |= SCALE_FELT252_COMPACTION_MARKER;
             dest.write(&compacted[..]);
         }
     }
@@ -328,7 +328,6 @@ impl MaxEncodedLen for Felt252Wrapper {
 /// Deserializes the felt252 buffer otherwise.
 impl Decode for Felt252Wrapper {
     fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
-
         // First byte is a counter, but also may contain
         // the compaction marker.
         let mut ctr = input.read_byte()?;
@@ -344,16 +343,18 @@ impl Decode for Felt252Wrapper {
 
             match Felt252Wrapper::try_from(&v[..]) {
                 Ok(felt) => return Ok(felt),
-                Err(e) => return Err(Error::from("Can't get FieldElement from input buffer (not compacted).")
-                                     .chain(hex::encode(&v[..]))
-                                     .chain(e)),
+                Err(e) => {
+                    return Err(Error::from("Can't get FieldElement from input buffer (not compacted).")
+                        .chain(hex::encode(&v[..]))
+                        .chain(e));
+                }
             }
         }
 
         let mut expanded: Vec<u8> = Vec::new();
 
         // Remove the compaction marker from the first counter.
-        ctr = ctr & !SCALE_FELT252_COMPACTION_MARKER;
+        ctr &= !SCALE_FELT252_COMPACTION_MARKER;
 
         while ctr != CTR_STOP_VALUE {
             let byte_value = input.read_byte()?;
@@ -367,7 +368,9 @@ impl Decode for Felt252Wrapper {
 
         match Felt252Wrapper::try_from(&expanded[..]) {
             Ok(felt) => Ok(felt),
-            Err(e) => Err(Error::from("Can't get FieldElement from input buffer (compacted).").chain(hex::encode(&expanded[..])).chain(e)),
+            Err(e) => Err(Error::from("Can't get FieldElement from input buffer (compacted).")
+                .chain(hex::encode(&expanded[..]))
+                .chain(e)),
         }
     }
 }
@@ -381,7 +384,7 @@ impl TypeInfo for Felt252Wrapper {
     fn type_info() -> Type {
         Type::builder()
             .path(Path::new("Felt252Wrapper", module_path!()))
-            .composite(Fields::unnamed().field(|f| f.ty::<[u8; 32]>().type_name("FieldElement")))
+            .composite(Fields::unnamed().field(|f| f.ty::<[u8]>().type_name("FieldElement")))
     }
 }
 
