@@ -1086,34 +1086,6 @@
 <a href="#1086" id="1086">1086</a>
 <a href="#1087" id="1087">1087</a>
 <a href="#1088" id="1088">1088</a>
-<a href="#1089" id="1089">1089</a>
-<a href="#1090" id="1090">1090</a>
-<a href="#1091" id="1091">1091</a>
-<a href="#1092" id="1092">1092</a>
-<a href="#1093" id="1093">1093</a>
-<a href="#1094" id="1094">1094</a>
-<a href="#1095" id="1095">1095</a>
-<a href="#1096" id="1096">1096</a>
-<a href="#1097" id="1097">1097</a>
-<a href="#1098" id="1098">1098</a>
-<a href="#1099" id="1099">1099</a>
-<a href="#1100" id="1100">1100</a>
-<a href="#1101" id="1101">1101</a>
-<a href="#1102" id="1102">1102</a>
-<a href="#1103" id="1103">1103</a>
-<a href="#1104" id="1104">1104</a>
-<a href="#1105" id="1105">1105</a>
-<a href="#1106" id="1106">1106</a>
-<a href="#1107" id="1107">1107</a>
-<a href="#1108" id="1108">1108</a>
-<a href="#1109" id="1109">1109</a>
-<a href="#1110" id="1110">1110</a>
-<a href="#1111" id="1111">1111</a>
-<a href="#1112" id="1112">1112</a>
-<a href="#1113" id="1113">1113</a>
-<a href="#1114" id="1114">1114</a>
-<a href="#1115" id="1115">1115</a>
-<a href="#1116" id="1116">1116</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A Substrate pallet implementation for Starknet, a decentralized, permissionless, and scalable
 //! zk-rollup for general-purpose smart contracts.
 //! See the [Starknet documentation](https://docs.starknet.io/) for more information.
@@ -1196,15 +1168,16 @@
     CallEntryPointWrapper, ClassHashWrapper, ContractAddressWrapper, ContractClassWrapper, EntryPointTypeWrapper,
     Felt252Wrapper,
 };
+<span class="kw">use </span>mp_starknet::sequencer_address::{InherentError, InherentType, DEFAULT_SEQUENCER_ADDRESS, INHERENT_IDENTIFIER};
 <span class="kw">use </span>mp_starknet::storage::{StarknetStorageSchemaVersion, PALLET_STARKNET_SCHEMA};
 <span class="kw">use </span>mp_starknet::traits::hash::{CryptoHasherT, DefaultHasher, HasherT};
 <span class="kw">use </span>mp_starknet::transaction::types::{
     DeclareTransaction, DeployAccountTransaction, EventError, EventWrapper <span class="kw">as </span>StarknetEventType, InvokeTransaction,
     Transaction, TransactionExecutionInfoWrapper, TransactionReceiptWrapper, TxType,
 };
-<span class="kw">use </span>sp_core::U256;
 <span class="kw">use </span>sp_runtime::traits::UniqueSaturatedInto;
 <span class="kw">use </span>sp_runtime::DigestItem;
+<span class="kw">use </span>sp_std::result;
 <span class="kw">use </span>starknet_api::api_core::{ChainId, ContractAddress};
 <span class="kw">use </span>starknet_api::block::{BlockNumber, BlockTimestamp};
 <span class="kw">use </span>starknet_api::hash::StarkFelt;
@@ -1215,11 +1188,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::types::{ContractStorageKeyWrapper, NonceWrapper, StorageKeyWrapper};
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">const </span>LOG_TARGET: <span class="kw-2">&amp;</span>str = <span class="string">&quot;runtime::starknet&quot;</span>;
-
-<span class="comment">// TODO: don&#39;t use a const for this but a real sequencer address for block header
-// FIXME https://github.com/keep-starknet-strange/madara/issues/243
-</span><span class="kw">pub const </span>SEQUENCER_ADDRESS: [u8; <span class="number">32</span>] =
-    [<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">222</span>, <span class="number">173</span>];
 
 <span class="kw">pub const </span>ETHEREUM_EXECUTION_RPC: <span class="kw-2">&amp;</span>[u8] = <span class="string">b&quot;starknet::ETHEREUM_EXECUTION_RPC&quot;</span>;
 <span class="kw">pub const </span>ETHEREUM_CONSENSUS_RPC: <span class="kw-2">&amp;</span>[u8] = <span class="string">b&quot;starknet::ETHEREUM_CONSENSUS_RPC&quot;</span>;
@@ -1270,6 +1238,10 @@
         /// set how long transactions are kept in the mempool.
         </span><span class="attr">#[pallet::constant]
         </span><span class="kw">type </span>TransactionLongevity: Get&lt;TransactionLongevity&gt;;
+        <span class="attr">#[pallet::constant]
+        </span><span class="kw">type </span>InvokeTxMaxNSteps: Get&lt;u32&gt;;
+        <span class="attr">#[pallet::constant]
+        </span><span class="kw">type </span>ValidateMaxNSteps: Get&lt;u32&gt;;
     }
 
     <span class="doccomment">/// The Starknet pallet hooks.
@@ -1280,6 +1252,8 @@
     </span><span class="kw">impl</span>&lt;T: Config&gt; Hooks&lt;BlockNumberFor&lt;T&gt;&gt; <span class="kw">for </span>Pallet&lt;T&gt; {
         <span class="doccomment">/// The block is being finalized.
         </span><span class="kw">fn </span>on_finalize(_n: T::BlockNumber) {
+            <span class="macro">assert!</span>(SeqAddrUpdate::&lt;T&gt;::take(), <span class="string">&quot;Sequencer address must be set for the block&quot;</span>);
+
             <span class="comment">// Create a new Starknet block and store it.
             </span>&lt;Pallet&lt;T&gt;&gt;::store_block(UniqueSaturatedInto::&lt;u64&gt;::unique_saturated_into(
                 frame_system::Pallet::&lt;T&gt;::block_number(),
@@ -1331,11 +1305,6 @@
     #[pallet::getter(<span class="kw">fn </span>pending_events)]
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">type </span>PendingEvents&lt;T: Config&gt; =
         StorageValue&lt;<span class="kw">_</span>, BoundedVec&lt;StarknetEventType, MaxTransactions&gt;, ValueQuery&gt;;
-
-    <span class="doccomment">/// The current Starknet block.
-    </span><span class="attr">#[pallet::storage]
-    #[pallet::getter(<span class="kw">fn </span>current_block)]
-    </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">type </span>CurrentBlock&lt;T: Config&gt; = StorageValue&lt;<span class="kw">_</span>, StarknetBlock, ValueQuery&gt;;
 
     <span class="doccomment">/// Mapping for block number and hashes.
     /// Safe to use `Identity` as the key is already a hash.
@@ -1389,6 +1358,16 @@
     #[pallet::getter(<span class="kw">fn </span>chain_id)]
     </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">type </span>ChainId&lt;T: Config&gt; = StorageValue&lt;<span class="kw">_</span>, Felt252Wrapper, ValueQuery&gt;;
 
+    <span class="doccomment">/// Current sequencer address.
+    </span><span class="attr">#[pallet::storage]
+    #[pallet::getter(<span class="kw">fn </span>sequencer_address)]
+    </span><span class="kw">pub type </span>SequencerAddress&lt;T: Config&gt; = StorageValue&lt;<span class="kw">_</span>, [u8; <span class="number">32</span>], ValueQuery&gt;;
+
+    <span class="doccomment">/// Ensure the sequencer address was updated for this block.
+    </span><span class="attr">#[pallet::storage]
+    #[pallet::getter(<span class="kw">fn </span>seq_addr_update)]
+    </span><span class="kw">pub type </span>SeqAddrUpdate&lt;T: Config&gt; = StorageValue&lt;<span class="kw">_</span>, bool, ValueQuery&gt;;
+
     <span class="doccomment">/// Starknet genesis configuration.
     </span><span class="attr">#[pallet::genesis_config]
     </span><span class="kw">pub struct </span>GenesisConfig&lt;T: Config&gt; {
@@ -1411,9 +1390,10 @@
         <span class="kw">pub </span>_phantom: PhantomData&lt;T&gt;,
         <span class="doccomment">/// The chain id.
         </span><span class="kw">pub </span>chain_id: Felt252Wrapper,
+        <span class="kw">pub </span>seq_addr_updated: bool,
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;std&quot;</span>)]
+    <span class="doccomment">/// `Default` impl required by `pallet::GenesisBuild`.
     </span><span class="kw">impl</span>&lt;T: Config&gt; Default <span class="kw">for </span>GenesisConfig&lt;T&gt; {
         <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
             <span class="self">Self </span>{
@@ -1423,6 +1403,7 @@
                 fee_token_address: ContractAddressWrapper::default(),
                 _phantom: PhantomData,
                 chain_id: Default::default(),
+                seq_addr_updated: <span class="bool-val">true</span>,
             }
         }
     }
@@ -1452,6 +1433,7 @@
             </span>FeeTokenAddress::&lt;T&gt;::set(<span class="self">self</span>.fee_token_address);
             <span class="comment">// Set the chain id from the genesis config.
             </span>ChainId::&lt;T&gt;::put(<span class="self">self</span>.chain_id);
+            SeqAddrUpdate::&lt;T&gt;::put(<span class="self">self</span>.seq_addr_updated);
         }
     }
 
@@ -1503,19 +1485,25 @@
     /// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
     </span><span class="attr">#[pallet::call]
     </span><span class="kw">impl</span>&lt;T: Config&gt; Pallet&lt;T&gt; {
-        <span class="doccomment">/// Ping the pallet to check if it is alive.
+        <span class="doccomment">/// Set the current block author&#39;s sequencer address.
+        ///
+        /// This call should be invoked exactly once per block. It will set a default value at
+        /// the finalization phase, if this call hasn&#39;t been invoked by that time.
+        ///
+        /// The dispatch origin for this call must be `Inherent`.
         </span><span class="attr">#[pallet::call_index(<span class="number">0</span>)]
-        #[pallet::weight({<span class="number">0</span>})]
-        </span><span class="kw">pub fn </span>ping(origin: OriginFor&lt;T&gt;) -&gt; DispatchResult {
+        #[pallet::weight((<span class="number">0</span>, DispatchClass::Mandatory))]
+        </span><span class="kw">pub fn </span>set_sequencer_address(origin: OriginFor&lt;T&gt;, addr: [u8; <span class="number">32</span>]) -&gt; DispatchResult {
             ensure_none(origin)<span class="question-mark">?</span>;
-            Pending::&lt;T&gt;::try_append((Transaction::default(), TransactionReceiptWrapper::default()))
-                .map_err(|<span class="kw">_</span>| Error::&lt;T&gt;::TooManyPendingTransactions)<span class="question-mark">?</span>;
-            PendingEvents::&lt;T&gt;::try_append(StarknetEventType::default())
-                .map_err(|<span class="kw">_</span>| Error::&lt;T&gt;::TooManyPendingEvents)<span class="question-mark">?</span>;
-            PendingEvents::&lt;T&gt;::try_append(StarknetEventType::default())
-                .map_err(|<span class="kw">_</span>| Error::&lt;T&gt;::TooManyPendingEvents)<span class="question-mark">?</span>;
-            <span class="macro">log!</span>(info, <span class="string">&quot;Keep Starknet Strange!&quot;</span>);
-            <span class="self">Self</span>::deposit_event(Event::KeepStarknetStrange);
+            <span class="comment">// The `SeqAddrUpdate` storage item is initialized to `true` in the genesis build. In
+            // block 1 we skip the storage update check, and the `on_finalize` hook
+            // updates the storage item to `false`. Initializing the storage item with
+            // `false` causes the `on_finalize` hook to panic.
+            </span><span class="kw">if </span>UniqueSaturatedInto::&lt;u64&gt;::unique_saturated_into(frame_system::Pallet::&lt;T&gt;::block_number()) &gt; <span class="number">1 </span>{
+                <span class="macro">assert!</span>(!SeqAddrUpdate::&lt;T&gt;::exists(), <span class="string">&quot;Sequencer address can be updated only once in the block&quot;</span>);
+            }
+            SequencerAddress::&lt;T&gt;::put(addr);
+            SeqAddrUpdate::&lt;T&gt;::put(<span class="bool-val">true</span>);
             <span class="prelude-val">Ok</span>(())
         }
 
@@ -1530,9 +1518,6 @@
         ///  # Returns
         ///
         /// * `DispatchResult` - The result of the transaction.
-        ///
-        /// # TODO
-        /// * Compute weight
         </span><span class="attr">#[pallet::call_index(<span class="number">1</span>)]
         #[pallet::weight({<span class="number">0</span>})]
         </span><span class="kw">pub fn </span>invoke(origin: OriginFor&lt;T&gt;, transaction: InvokeTransaction) -&gt; DispatchResult {
@@ -1593,9 +1578,6 @@
         ///  # Returns
         ///
         /// * `DispatchResult` - The result of the transaction.
-        ///
-        /// # TODO
-        /// * Compute weight
         </span><span class="attr">#[pallet::call_index(<span class="number">2</span>)]
         #[pallet::weight({<span class="number">0</span>})]
         </span><span class="kw">pub fn </span>declare(origin: OriginFor&lt;T&gt;, transaction: DeclareTransaction) -&gt; DispatchResult {
@@ -1679,9 +1661,6 @@
         ///  # Returns
         ///
         /// * `DispatchResult` - The result of the transaction.
-        ///
-        /// # TODO
-        /// * Compute weight
         </span><span class="attr">#[pallet::call_index(<span class="number">3</span>)]
         #[pallet::weight({<span class="number">0</span>})]
         </span><span class="kw">pub fn </span>deploy_account(origin: OriginFor&lt;T&gt;, transaction: DeployAccountTransaction) -&gt; DispatchResult {
@@ -1790,38 +1769,28 @@
 
             <span class="prelude-val">Ok</span>(())
         }
+    }
 
-        <span class="doccomment">/// Set the value of the fee token address.
-        ///
-        /// # Arguments
-        ///
-        /// * `origin` - The origin of the transaction.
-        /// * `fee_token_address` - The value of the fee token address.
-        ///
-        /// # Returns
-        ///
-        /// * `DispatchResult` - The result of the transaction.
-        ///
-        /// # TODO
-        /// * Add some limitations on how often this can be called.
-        </span><span class="attr">#[pallet::call_index(<span class="number">5</span>)]
-        #[pallet::weight({<span class="number">0</span>})]
-        </span><span class="kw">pub fn </span>set_fee_token_address(
-            origin: OriginFor&lt;T&gt;,
-            fee_token_address: ContractAddressWrapper,
-        ) -&gt; DispatchResult {
-            <span class="comment">// Only root can set the fee token address.
-            </span>ensure_root(origin)<span class="question-mark">?</span>;
-            <span class="comment">// Get current fee token address.
-            </span><span class="kw">let </span>current_fee_token_address = <span class="self">Self</span>::fee_token_address();
-            <span class="comment">// Update the fee token address.
-            </span>FeeTokenAddress::&lt;T&gt;::put(fee_token_address);
-            <span class="comment">// Emit event.
-            </span><span class="self">Self</span>::deposit_event(Event::FeeTokenAddressChanged {
-                old_fee_token_address: current_fee_token_address,
-                new_fee_token_address: fee_token_address,
-            });
+    <span class="attr">#[pallet::inherent]
+    </span><span class="kw">impl</span>&lt;T: Config&gt; ProvideInherent <span class="kw">for </span>Pallet&lt;T&gt; {
+        <span class="kw">type </span>Call = Call&lt;T&gt;;
+        <span class="kw">type </span>Error = InherentError;
+        <span class="kw">const </span>INHERENT_IDENTIFIER: InherentIdentifier = INHERENT_IDENTIFIER;
+
+        <span class="kw">fn </span>create_inherent(data: <span class="kw-2">&amp;</span>InherentData) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Call&gt; {
+            <span class="kw">let </span>inherent_data = data
+                .get_data::&lt;InherentType&gt;(<span class="kw-2">&amp;</span>INHERENT_IDENTIFIER)
+                .expect(<span class="string">&quot;Sequencer address inherent data not correctly encoded&quot;</span>)
+                .unwrap_or(DEFAULT_SEQUENCER_ADDRESS);
+            <span class="prelude-val">Some</span>(Call::set_sequencer_address { addr: inherent_data })
+        }
+
+        <span class="kw">fn </span>check_inherent(_call: <span class="kw-2">&amp;</span><span class="self">Self</span>::Call, _data: <span class="kw-2">&amp;</span>InherentData) -&gt; result::Result&lt;(), <span class="self">Self</span>::Error&gt; {
             <span class="prelude-val">Ok</span>(())
+        }
+
+        <span class="kw">fn </span>is_inherent(call: <span class="kw-2">&amp;</span><span class="self">Self</span>::Call) -&gt; bool {
+            <span class="macro">matches!</span>(call, Call::set_sequencer_address { .. })
         }
     }
 
@@ -1858,7 +1827,7 @@
                     </span><span class="self">Self</span>::validate_tx(transaction, transaction_type)<span class="question-mark">?</span>;
                     <span class="comment">// add the requires tag
                     </span><span class="kw">let </span>sender_nonce = Pallet::&lt;T&gt;::nonce(sender_address);
-                    <span class="kw">if </span>Into::&lt;U256&gt;::into(transaction_nonce) &gt; sender_nonce {
+                    <span class="kw">if </span>transaction_nonce.<span class="number">0 </span>&gt; sender_nonce.<span class="number">0 </span>{
                         valid_transaction_builder = valid_transaction_builder
                             .and_requires((sender_address, Felt252Wrapper(transaction_nonce.<span class="number">0 </span>- FieldElement::ONE)));
                     }
@@ -1917,9 +1886,9 @@
     ///
     /// Returns an error if transaction validation fails.
     </span><span class="kw">fn </span>validate_tx(transaction: Transaction, tx_type: TxType) -&gt; <span class="prelude-ty">Result</span>&lt;(), TransactionValidityError&gt; {
+        <span class="kw">let </span>block_context = <span class="self">Self</span>::get_block_context();
         <span class="kw">let </span><span class="kw-2">mut </span>state: BlockifierStateAdapter&lt;T&gt; = BlockifierStateAdapter::&lt;T&gt;::default();
         <span class="kw">let </span><span class="kw-2">mut </span>execution_resources = ExecutionResources::default();
-        <span class="kw">let </span>block_context = <span class="self">Self</span>::get_block_context();
         transaction
             .validate_account_tx(<span class="kw-2">&amp;mut </span>state, <span class="kw-2">&amp;mut </span>execution_resources, <span class="kw-2">&amp;</span>block_context, <span class="kw-2">&amp;</span>tx_type)
             .map_err(|<span class="kw">_</span>| TransactionValidityError::Invalid(InvalidTransaction::BadProof))<span class="question-mark">?</span>;
@@ -1937,11 +1906,9 @@
         </span><span class="kw">let </span>fee_token_address =
             ContractAddress::try_from(StarkFelt::new(<span class="self">Self</span>::fee_token_address().into()).unwrap()).unwrap();
         <span class="kw">let </span>chain_id = <span class="self">Self</span>::chain_id_str();
-        <span class="kw">let </span>sequencer_address = ContractAddress(starknet_api::api_core::PatriciaKey(StarkFelt(SEQUENCER_ADDRESS)));
+        <span class="kw">let </span>provided_seq_addr = <span class="self">Self</span>::sequencer_address();
+        <span class="kw">let </span>sequencer_address = ContractAddress(starknet_api::api_core::PatriciaKey(StarkFelt(provided_seq_addr)));
         <span class="kw">let </span>vm_resource_fee_cost = HashMap::default();
-        <span class="comment">// FIXME: https://github.com/keep-starknet-strange/madara/issues/545
-        </span><span class="kw">let </span>invoke_tx_max_n_steps = <span class="number">1000000</span>;
-        <span class="kw">let </span>validate_max_n_steps = <span class="number">1000000</span>;
         <span class="comment">// FIXME: https://github.com/keep-starknet-strange/madara/issues/329
         </span><span class="kw">let </span>gas_price = <span class="number">10</span>;
         BlockContext {
@@ -1951,19 +1918,10 @@
             sequencer_address,
             fee_token_address,
             vm_resource_fee_cost,
-            invoke_tx_max_n_steps,
-            validate_max_n_steps,
+            invoke_tx_max_n_steps: T::InvokeTxMaxNSteps::get(),
+            validate_max_n_steps: T::ValidateMaxNSteps::get(),
             gas_price,
         }
-    }
-    <span class="doccomment">/// Get current block hash.
-    ///
-    /// # Returns
-    ///
-    /// The current block hash.
-    </span><span class="attr">#[inline(always)]
-    </span><span class="kw">pub fn </span>current_block_hash() -&gt; Felt252Wrapper {
-        <span class="self">Self</span>::current_block().header().hash(T::SystemHash::hasher())
     }
 
     <span class="doccomment">/// convert chain_id
@@ -2015,10 +1973,8 @@
         function_selector: Felt252Wrapper,
         calldata: Vec&lt;Felt252Wrapper&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;Felt252Wrapper&gt;, DispatchError&gt; {
-        <span class="comment">// Get current block
-        </span><span class="kw">let </span>block = <span class="self">Self</span>::current_block();
-        <span class="comment">// Get fee token address
-        </span><span class="kw">let </span>fee_token_address = <span class="self">Self</span>::fee_token_address();
+        <span class="comment">// Get current block context
+        </span><span class="kw">let </span>block_context = <span class="self">Self</span>::get_block_context();
         <span class="comment">// Get class hash
         </span><span class="kw">let </span>class_hash = ContractClassHashes::&lt;T&gt;::try_get(address).map_err(|<span class="kw">_</span>| Error::&lt;T&gt;::ContractNotFound)<span class="question-mark">?</span>;
 
@@ -2029,16 +1985,10 @@
             BoundedVec::try_from(calldata).unwrap_or_default(),
             address,
             ContractAddressWrapper::default(),
-        );
+            Felt252Wrapper::from(<span class="number">0_u8</span>), <span class="comment">// TODO (Greg) update this once transaction contains the initial gas
+        </span>);
 
-        <span class="kw">let </span>chain_id = <span class="self">Self</span>::chain_id_str();
-
-        <span class="kw">match </span>entrypoint.execute(
-            <span class="kw-2">&amp;mut </span>BlockifierStateAdapter::&lt;T&gt;::default(),
-            block,
-            fee_token_address,
-            ChainId(chain_id),
-        ) {
+        <span class="kw">match </span>entrypoint.execute(<span class="kw-2">&amp;mut </span>BlockifierStateAdapter::&lt;T&gt;::default(), block_context) {
             <span class="prelude-val">Ok</span>(v) =&gt; {
                 <span class="macro">log!</span>(debug, <span class="string">&quot;Transaction executed successfully: {:?}&quot;</span>, v);
                 <span class="kw">let </span>result = v.execution.retdata.<span class="number">0</span>.iter().map(|x| (<span class="kw-2">*</span>x).into()).collect();
@@ -2072,9 +2022,7 @@
         <span class="kw">let </span>pending = <span class="self">Self</span>::pending();
 
         <span class="kw">let </span>global_state_root = Felt252Wrapper::ZERO;
-        <span class="comment">// TODO: use the real sequencer address (our own address)
-        // FIXME #243
-        </span><span class="kw">let </span>sequencer_address = SEQUENCER_ADDRESS;
+        <span class="kw">let </span>sequencer_address = <span class="self">Self</span>::sequencer_address();
         <span class="kw">let </span>block_timestamp = <span class="self">Self</span>::block_timestamp();
         <span class="kw">let </span>transaction_count = pending.len() <span class="kw">as </span>u128;
 
@@ -2112,8 +2060,6 @@
             </span>BoundedVec::try_from(transactions).unwrap(),
             BoundedVec::try_from(receipts).unwrap(),
         );
-        <span class="comment">// Save the current block.
-        </span>CurrentBlock::&lt;T&gt;::put(block.clone());
         <span class="comment">// Save the block number &lt;&gt; hash mapping.
         </span><span class="kw">let </span>blockhash = block.header().hash(T::SystemHash::hasher());
         BlockHash::&lt;T&gt;::insert(block_number, blockhash);
@@ -2144,13 +2090,11 @@
         }
 
         <span class="kw">for </span>inner_call <span class="kw">in </span><span class="kw-2">&amp;mut </span>call_info.inner_calls {
-            inner_call.execution.events.sort_by_key(|ordered_event| ordered_event.order);
-            <span class="kw">for </span>ordered_event <span class="kw">in </span><span class="kw-2">&amp;</span>inner_call.execution.events {
-                <span class="kw">let </span>event_type = <span class="self">Self</span>::emit_event(<span class="kw-2">&amp;</span>ordered_event.event, inner_call.call.storage_address, tx_hash)<span class="question-mark">?</span>;
-                events.push(event_type);
+            <span class="kw">let </span>inner_events = <span class="self">Self</span>::emit_events(inner_call, tx_hash)<span class="question-mark">?</span>;
+            <span class="kw">if </span>!inner_events.is_empty() {
+                events.extend(inner_events);
             }
         }
-
         <span class="prelude-val">Ok</span>(events)
     }
 
